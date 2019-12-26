@@ -80,9 +80,12 @@ typings/
 
 # credentials
 credentials/*.json
-content.json
-content/*.png
 
+content.json
+
+content/*.png
+content/*.jpg
+.DS_Store
 
 # Nuxt.js build / generate output
 .nuxt
