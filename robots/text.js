@@ -1,12 +1,27 @@
+
 const algorithmia = require('algorithmia')
 const algorithmiaApiKey = require('../credentials/algorithmia.json').apiKey
-const sentenceBoundaryDetection = require('sbd') //observar.. caso nao funcione //importa 
+const sentenceBoundaryDetection = require('sbd') //observar.. caso nao funcione
+
+const fs = require('fs');
+const watsonApiKey = require('../credentials/watson-nlu.json').apikey
+const NaturalLanguageUnderstandingV1 = require('ibm-watson/natural-language-understanding/v1');
+const { IamAuthenticator } = require('ibm-watson/auth');
+ 
+const nlu = new NaturalLanguageUnderstandingV1({
+  authenticator: new IamAuthenticator({ apikey: watsonApiKey}),
+  version: '2018-04-05',
+  url: 'https://gateway.watsonplatform.net/natural-language-understanding/api/'
+});
 
 
 async function robot (content){// async esperar a execusao do codigo
-  await fetchContentFromWikipedia(content)
+
+  await fetchContentFromWikipedia(content);
   sanitizeContent(content);
   breakContentIntoSentences(content);//observar.. caso nao funcione
+  limitMaximumSentences(content);
+  await fetchKeywordsOfAllSentences(content)
 
 
   async function fetchContentFromWikipedia(content){
@@ -17,6 +32,7 @@ async function robot (content){// async esperar a execusao do codigo
 
      content.sourceContentOriginal = wikipediaContent.content
   }
+
   function sanitizeContent(content) {
     const withoutBlankLinesAndMarkdown = removeBlankLinesAndMarkdown(content.sourceContentOriginal)
     const withoutDatesInParentheses = removeDatesInParentheses(withoutBlankLinesAndMarkdown)
@@ -54,5 +70,50 @@ async function robot (content){// async esperar a execusao do codigo
       })
     })
   }
+
+   function limitMaximumSentences(content){
+      content.sentences = content.sentences.slice(0, content.maximumSentences)
+  }
+
+
+  async function fetchKeywordsOfAllSentences(content) {
+      for (const sentence of content.sentences) {
+        sentence.keywords =  await fetchWatsonAndReturnKeywords(sentence.text);
+    }
+  }
+
+
+  async function fetchWatsonAndReturnKeywords(sentence) {
+    return new Promise((resolve, reject) => {
+      nlu.analyze({
+        text: sentence,
+        features: {
+          keywords:{}
+        }
+      })
+      .then(response => {
+        
+           const obj = response
+            const objeto = obj[Object.keys(obj)[3]]
+
+            let keywordss = objeto['keywords']
+
+            let keywords = keywordss.map(function(item){
+              let valorReal = item['text']
+              return valorReal
+            })
+
+           
+         
+       //console.log(keywords)
+  
+         resolve(keywords)
+        })
+      .catch(err => {
+        console.log('error: ', err);
+      })
+    })
+  }
+  
 }
-module.exports = robot;
+module.exports = robot
